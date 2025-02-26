@@ -1,25 +1,27 @@
 package com.midhun.flagchallenge
 
-import android.app.Application
+
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.midhun.flagchallenge.model.ChallengeModel
-import com.midhun.flagchallenge.screens.QuizScreen
+import com.midhun.flagchallenge.screens.GameOver
+import com.midhun.flagchallenge.screens.ScorePage
 import com.midhun.flagchallenge.screens.SetTime
 import com.midhun.flagchallenge.screens.StartChallenge
 import com.midhun.flagchallenge.screens.TimerPage
@@ -48,7 +50,27 @@ class MainActivity : ComponentActivity() {
     fun Navigation(modifier: Modifier,viewModel: ChallengeViewModel){
         val navController = rememberNavController()
 
-        NavHost(navController, startDestination = "start_challenge"){
+        val context = LocalContext.current
+
+        val sharedPreferences = context.getSharedPreferences("GAME", Context.MODE_PRIVATE)
+
+        val isStart by remember {
+            mutableStateOf(sharedPreferences.getString("isStart","")?:"false")
+        }
+
+        var destination by remember {
+            mutableStateOf("")
+        }
+
+        destination = if(isStart == "true"){
+            "start_challenge"
+        } else{
+            "set_time"
+
+        }
+
+
+        NavHost(navController, startDestination = destination){
             composable("set_time"){
                 SetTime(modifier,navController)
             }
@@ -56,7 +78,14 @@ class MainActivity : ComponentActivity() {
                 TimerPage(modifier,navController)
             }
             composable("start_challenge"){
-                StartChallenge(modifier,viewModel)
+                StartChallenge(modifier,viewModel,navController)
+            }
+            composable("game_over"){
+                GameOver(modifier, navController)
+            }
+
+            composable("score_page"){
+                ScorePage(modifier,navController,viewModel)
             }
 
         }

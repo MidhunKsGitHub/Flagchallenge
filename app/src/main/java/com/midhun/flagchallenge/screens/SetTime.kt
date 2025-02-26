@@ -197,7 +197,7 @@ fun SetTime(modifier: Modifier = Modifier,navController:NavController) {
                         val formattedTime = String.format("%02d:%02d:%02d",hrs,min,sec)
                         sharedPreferences.edit().putString("saved_time",formattedTime).apply()
                         savedTime = formattedTime
-                        Toast.makeText(context, formattedTime, Toast.LENGTH_LONG).show()
+
                         navController.navigate("timer_page")
                     }
 

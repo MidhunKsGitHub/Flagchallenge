@@ -2,7 +2,6 @@ package com.midhun.flagchallenge.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.midhun.flagchallenge.model.QuestionModel
 import com.midhun.flagchallenge.ui.theme.primaryGreen
@@ -54,29 +53,17 @@ import com.midhun.flagchallenge.ui.theme.primaryLightGrey
 import com.midhun.flagchallenge.ui.theme.primaryOrange
 import com.midhun.flagchallenge.ui.theme.primaryRed
 import com.midhun.flagchallenge.viewModel.ChallengeViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @SuppressLint("DefaultLocale")
 @Composable
-fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel) {
+fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel,navController: NavController) {
 
     val context = LocalContext.current
 
     val data = viewModel.data.observeAsState()
 
-    var questionNumber by remember {
-        mutableIntStateOf(0)
-    }
-
     val listState = rememberLazyListState()
-    var countDown by remember {
-        mutableIntStateOf(3)
-    }
-
-    var currentIndex by remember {
-        mutableIntStateOf(0)
-    }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -86,30 +73,25 @@ fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel) 
     val selectedAnswer by viewModel.selectedAnswer.collectAsState()
     val gameOver by viewModel.gameOver.collectAsState()
 
-//
-//    LaunchedEffect(currentIndex) {
-//        while(countDown > 0) {
-//            delay(1000L)
-//            countDown -= 1
-//        }
-//
-//        if (countDown == 0) {
-//            countDown = 30
-//            currentIndex++
-//            coroutineScope.launch {
-//                listState.animateScrollToItem(currentIndex)
-//            }
-//        }
-//
-//
-//    }
+    val sharedPreferences = context.getSharedPreferences("GAME", Context.MODE_PRIVATE)
+
+
+
+    LaunchedEffect(Unit) {
+        sharedPreferences.edit().putString("isStart","true").apply()
+        viewModel.startTimer()
+    }
 
     LaunchedEffect(questionIndex) {
 
-
-            coroutineScope.launch {
+        coroutineScope.launch {
                 listState.animateScrollToItem(questionIndex)
            }
+
+
+       if(questionIndex == data.value?.questions?.size){
+           navController.navigate("game_over")
+       }
 
     }
 
@@ -154,7 +136,6 @@ fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel) 
                     contentAlignment = Alignment.Center
 
                 ) {
-                    val seconds = countDown%60
                     val formattedTime = String.format("%02d",timeLeft)
 
                     Text(
@@ -186,8 +167,8 @@ fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel) 
                 ) {
                     data.value?.questions?.size?.let {
                         items(it){ index->
-                            questionNumber = index
-                            Questions(modifier,context,viewModel,questionNumber, data.value?.questions!!,timeLeft)
+
+                            QuestionScreen(context,data.value?.questions!!,index,timeLeft,viewModel)
                         }
                     }
                 }
@@ -198,24 +179,78 @@ fun StartChallenge(modifier: Modifier = Modifier,viewModel: ChallengeViewModel) 
     }
 }
 
+
 @Composable
-fun Questions(modifier: Modifier = Modifier,context: Context,viewModel: ChallengeViewModel,index:Int,flags:ArrayList<QuestionModel>,timeLeft:Int) {
+fun BoxWithText(
+    name: String,
+    isCorrect: Boolean,
+    isSelected: Boolean,
+    timeLeft: Int,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(5.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        OutlinedButton(
+            onClick = onClick,
+            shape = RoundedCornerShape(6.dp),
+            colors = ButtonColors(
+                containerColor = when {
+                    timeLeft == 0 && isCorrect -> primaryGreen
+                    timeLeft == 0 && isSelected -> primaryRed
+                    isSelected -> primaryOrange
+                    else -> Color.White
+                },
+                contentColor = if (isSelected) Color.White else Color.Black,
+                disabledContainerColor = Color.Gray,
+                disabledContentColor = Color.Gray
+            ),
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier
+                .widthIn(min = 100.dp)
+                .height(28.dp)
+        ) {
+            Text(
+                name,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.W500,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
-    val coroutineScope = rememberCoroutineScope()
+        if (timeLeft == 0) {
+            Text(
+                if (isCorrect) "CORRECT" else "WRONG",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.W500,
+                color = if (isCorrect) primaryGreen else primaryRed
+            )
+        }
+    }
+}
 
-        val countryCode = flags[index].country_code
+@Composable
+fun QuestionScreen(context: Context,flags:ArrayList<QuestionModel>, index: Int, timeLeft: Int,viewModel: ChallengeViewModel) {
 
-        val option0 = flags[index].countries?.get(0)?.country_name
-        val option1 = flags[index].countries?.get(1)?.country_name
-        val option2 = flags[index].countries?.get(2)?.country_name
-        val option3 = flags[index].countries?.get(3)?.country_name
 
-    val id0 = flags[index].countries?.get(0)?.id
-    val id1 = flags[index].countries?.get(1)?.id
-    val id2 = flags[index].countries?.get(2)?.id
-    val id3 = flags[index].countries?.get(3)?.id
+    val countryCode = flags[index].country_code
+    val answerId = flags[index].answer_id.toString()
 
-    var result = "wrong"
+    val option0 = flags[index].countries?.get(0)?.country_name.toString()
+    val option1 = flags[index].countries?.get(1)?.country_name.toString()
+    val option2 = flags[index].countries?.get(2)?.country_name.toString()
+    val option3 = flags[index].countries?.get(3)?.country_name.toString()
+
+    val id0 = flags[index].countries?.get(0)?.id.toString()
+    val id1 = flags[index].countries?.get(1)?.id.toString()
+    val id2 = flags[index].countries?.get(2)?.id.toString()
+    val id3 = flags[index].countries?.get(3)?.id.toString()
+
+    var selectedId by remember { mutableStateOf<Int?>(null) }
+
 
     Column(modifier = Modifier.padding(10.dp)) {
 
@@ -234,22 +269,25 @@ fun Questions(modifier: Modifier = Modifier,context: Context,viewModel: Challeng
                 )
             }
             Spacer(modifier = Modifier.width(25.dp))
-                Text(
-                    "GUESS THE COUNTRY FROM THE FLAG ?",
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                    fontSize = 14.sp
-                )
+            Text(
+                "GUESS THE COUNTRY FROM THE FLAG ?",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp
+            )
 
-    }
+        }
         Spacer(modifier = Modifier.height(25.dp))
 
-        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically){
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
             Spacer(modifier = Modifier.width(15.dp))
             Card {
 
-                Box(modifier=Modifier.padding(5.dp)) {
+                Box(modifier = Modifier.padding(5.dp)) {
                     AsyncImage(
                         modifier = Modifier
                             .width(100.dp)
@@ -262,117 +300,57 @@ fun Questions(modifier: Modifier = Modifier,context: Context,viewModel: Challeng
             }
 
             Spacer(modifier = Modifier.width(25.dp))
+            Column {
+                Row {
+                    BoxWithText(
+                        name = option0,
+                        isCorrect = answerId == id0,
+                        isSelected = selectedId == id0.toInt(),
+                        timeLeft = timeLeft
+                    ) { selectedId = id0.toInt()
+                    if(answerId == id0){
+                        viewModel.scoreUpdate()
+                    }
+                    }
 
-            Column() {
-                BoxWithText(option0.toString(), onclick ={
+                    BoxWithText(
+                        name = option1,
+                        isCorrect = answerId == id1,
+                        isSelected = selectedId == id1.toInt(),
+                        timeLeft = timeLeft
+                    ) { selectedId = id1.toInt()
+                        if(answerId == id1){
 
+                            viewModel.scoreUpdate()
+                        }}
+                }
 
-                        if (flags[index].answer_id == id0) {
-                            viewModel.selectedAnswer(id0)
-                            Toast.makeText(context, "Correct", Toast.LENGTH_LONG).show()
-                            result = "correct"
-                        } else {
-                            result = "wrong"
+                Row {
+                    BoxWithText(
+                        name = option2,
+                        isCorrect = answerId == id2,
+                        isSelected = selectedId == id2.toInt(),
+                        timeLeft = timeLeft
+                    ) { selectedId = id2.toInt()
+                        if(answerId == id2){
+                            viewModel.scoreUpdate()
                         }
-
-
-                        return@BoxWithText result
-
-
-                },timeLeft,index)
-
-                BoxWithText(option1.toString(), onclick ={
-
-                    if(flags[index].answer_id == id1){
-                        Toast.makeText(context, "Correct", Toast.LENGTH_LONG).show()
-                        result = "correct"
-                    }
-                    else{
-                        result ="wrong"
                     }
 
+                    BoxWithText(
+                        name = option3,
+                        isCorrect = answerId == id3,
+                        isSelected = selectedId == id3.toInt(),
+                        timeLeft = timeLeft
+                    ) { selectedId = id3.toInt()
+                        if(answerId == id3){
 
-                    return@BoxWithText result
-
-
-                },timeLeft,index)
-            }
-            Column() {
-                BoxWithText(option2.toString(), onclick ={
-
-                    if(flags[index].answer_id == id2){
-                        Toast.makeText(context, "Correct", Toast.LENGTH_LONG).show()
-
-                        result = "correct"
+                            viewModel.scoreUpdate()
+                        }
                     }
-                    else{
-                        result ="wrong"
-                    }
-
-
-                    return@BoxWithText result
-                },timeLeft,index)
-
-                BoxWithText(option3.toString(), onclick ={
-
-                    if(flags[index].answer_id == id3){
-                        Toast.makeText(context, "Correct", Toast.LENGTH_LONG).show()
-                        result = "correct"
-
-                    }
-                    else{
-                        result ="wrong"
-                    }
-
-
-                    return@BoxWithText result
-                },timeLeft,index)
+                }
             }
         }
-
     }
-
-    }
-
-@Composable
-fun BoxWithText(name: String, onclick: () -> String,timeLeft: Int,index: Int) {
-    Column(modifier=Modifier.padding(5.dp), verticalArrangement = Arrangement.SpaceBetween, horizontalAlignment = Alignment.CenterHorizontally) {
-var visibilityText by remember {
-    mutableStateOf("invisible")
-}
-
-        var onClicked by remember {
-            mutableStateOf(false)
-        }
-       OutlinedButton(onClick = {
-         visibilityText =  onclick.invoke()
-        onClicked = ! onClicked
-
-       },
-           shape = RoundedCornerShape(6.dp),
-           colors = ButtonColors(
-               containerColor = if(onClicked) primaryOrange else Color.White,
-               contentColor =if(onClicked) Color.White else Color.Black,
-               disabledContainerColor = Color.Gray,
-               disabledContentColor = Color.Gray
-           ),
-
-           contentPadding = PaddingValues(0.dp),
-           modifier=Modifier
-               .widthIn(min = 100.dp)
-               .height(28.dp)
-               ){
-           Text(name, fontSize = 10.sp,modifier=Modifier, fontWeight = FontWeight.W500, maxLines = 1, overflow = TextOverflow.Ellipsis)
-       }
-
-
-        if(visibilityText == "correct" && timeLeft ==0){
-                   Text("CORRECT", fontSize = 8.sp,modifier=Modifier.padding(0.dp), fontWeight = FontWeight.W500, color = primaryGreen)
-        }
-        if(visibilityText == "wrong" && timeLeft == 0){
-            Text("WRONG", fontSize = 8.sp,modifier=Modifier.padding(0.dp), fontWeight = FontWeight.W500, color = primaryRed)
-
-        }
-   }
 }
 

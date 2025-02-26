@@ -2,6 +2,7 @@ package com.midhun.flagchallenge.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.midhun.flagchallenge.ui.theme.primaryLightGrey
 import com.midhun.flagchallenge.ui.theme.primaryOrange
+import kotlinx.coroutines.delay
 
 @SuppressLint("DefaultLocale")
 @Composable
@@ -43,6 +45,9 @@ fun TimerPage (modifier: Modifier = Modifier,navController: NavController) {
 
     val savedTime by remember {
         mutableStateOf(sharedPreferences.getString("saved_time","00:00:00")?:"00:00:00")
+    }
+    var navigationTriggered by remember {
+        mutableStateOf(false)
     }
 
   val totalSeconds = savedTime.split(":").let {
@@ -56,17 +61,23 @@ var countDown by remember {
 }
     LaunchedEffect(Unit) {
         while(countDown > 0){
-          kotlinx.coroutines.delay(1000L)
+          delay(1000L)
             countDown -= 1
         }
-        if (countDown == 0){
-          navController.navigate("start_challenge"){
-            popUpTo("timer_page"){
-                inclusive = true
+
+        if (countDown == 0 && !navigationTriggered){
+
+            navigationTriggered = true
+
+            navController.navigate("start_challenge"){
+                popUpTo("timer_page"){
+                    inclusive = true
+                }
             }
-          }
         }
     }
+
+
 
     val hours =countDown/3600
     val minutes = (countDown%3600)/60
